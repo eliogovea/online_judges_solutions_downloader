@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import getpass
 import requests
@@ -79,12 +80,20 @@ def get_submission_code(session, judge_id, password, url):
     return response.text
 
 if __name__ == '__main__':
-    judge_id = input('Judge ID: ')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('judge_id', help='judge id', type=str)
+    parser.add_argument('--accepted_only', help='download accepted solutions only', action='store_true')
+
+    args = parser.parse_args()
+
+    print('Judge ID: {}'.format(args.judge_id))
+    print('Accepted Only: {}'.format(args.accepted_only))
+
     password = getpass.getpass('Password: ')
-    accepted_only = bool(input('Accepted only: '))
+
     session = requests.session()
     print('getting submissions ...')
-    submissions = get_submissions_list(session, get_judge_number(judge_id), accepted_only)
+    submissions = get_submissions_list(session, get_judge_number(args.judge_id), args.accepted_only)
     print('found {} submissions'.format(len(submissions)))
     solutions_folder = 'timus_solutions'
     if not os.path.exists(solutions_folder):
@@ -93,10 +102,10 @@ if __name__ == '__main__':
         submission_id = get_submission_id_from_url(submission['submission_url'])
         problem_id = get_problem_id_from_url(submission['problem_url'])
         print('problem id: {}, submission id: {}'.format(problem_id, submission_id))
-        code = get_submission_code(session, judge_id, password, 'http://acm.timus.ru/' + submission['submission_url'])
+        code = get_submission_code(session, args.judge_id, password, 'http://acm.timus.ru/' + submission['submission_url'])
         content = ""
-        content = content + '// {}\n'.format(submission['problem_url'])
-        content = content + '// {}\n'.format(submission['verdict'])
+        content = content + '// Problem: {}\n'.format(get_submission_id_from_url(submission['problem_url']))
+        content = content + '// Verdict: {}\n'.format(submission['verdict'])
         content = content + '\n'
         content = content + code
         with open('{}/{}-{}'.format(solutions_folder, problem_id, submission_id), 'w', encoding='utf-8') as f:
