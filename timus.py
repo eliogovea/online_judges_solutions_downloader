@@ -21,8 +21,11 @@ def get_submission_id_from_url(url):
     pos = url.find(patt)
     return url[pos + len(patt):]
 
+def remove_ext(s):
+    pos = s.find('.')
+    return s[:pos]
+
 def get_submissions_list(session, judge_number, accepted_only = False):
-    # TODO download the next 100 submission again and again ...
     url = 'http://acm.timus.ru/status.aspx'
     params = {
         'author': judge_number,
@@ -31,28 +34,38 @@ def get_submissions_list(session, judge_number, accepted_only = False):
     if accepted_only:
         params['status'] = 'accepted'
 
-    response = session.get(url, params = params)
-    
-    tree = html.fromstring(response.text)
-    table = tree.xpath('.//table[@class="status"]')
-    rows = table[0].xpath('.//tr')
-
     submissions = []
-
-    for row in rows:
-        if (not 'even' in row.classes) and (not 'odd' in row.classes):
-            continue
-        submission_url = row.xpath('.//td[@class="id"]/a')[0].attrib['href']
-        problem_url = row.xpath('.//td[@class="problem"]/a')[0].attrib['href']
-        message = 'Accepted'
-        accepted = len(row.xpath('./td[@class="verdict_ac"]')) > 0
-        if not accepted:
-            message = row.xpath('.//td[@class="verdict_rj"]')[0].text
-        submissions.append({
-            'problem_url': problem_url,
-            'submission_url': submission_url,
-            'verdict': message
-        })
+    while True:
+        print('getting submissions from {}, with params = {}'.format(url, params))
+        response = session.get(url, params = params)
+        tree = html.fromstring(response.text)
+        table = tree.xpath('.//table[@class="status"]')
+        rows = table[0].xpath('.//tr')
+        last_submission_id = None
+        for row in rows:
+            if (not 'even' in row.classes) and (not 'odd' in row.classes):
+                continue
+            submission_url = row.xpath('.//td[@class="id"]/a')[0].attrib['href']
+            problem_url = row.xpath('.//td[@class="problem"]/a')[0].attrib['href']
+            message = 'Accepted'
+            accepted = len(row.xpath('./td[@class="verdict_ac"]')) > 0
+            if not accepted:
+                message = row.xpath('.//td[@class="verdict_rj"]')[0].text
+            submissions.append({
+                'problem_url': problem_url,
+                'submission_url': submission_url,
+                'verdict': message
+            })
+            last_submission_id = remove_ext(get_submission_id_from_url(submission_url))
+        footer = tree.xpath('.//td[@class="footer_right"]/a')
+        cont = False
+        for element in footer:
+            if element.text != 'To the top':
+                cont = True
+        if not cont:
+            break
+        assert(last_submission_id != None)
+        params['from'] = last_submission_id
 
     return submissions 
 
